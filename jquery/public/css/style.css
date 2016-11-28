@@ -1,0 +1,27 @@
+body {
+  text-align: center;
+  background-color: #0769AD;
+  color: #fff;
+  padding: 48px 0;
+}
+
+h1 {
+  font-family: helvetica, arial, sans-serif;
+}
+
+a {
+  color: #03A9F4;
+}
+
+main {
+  margin: 30px auto;
+}
+
+img {
+  display: block;
+  margin: 30px auto;
+}
+
+footer {
+  font-size: 0.8em;
+}
