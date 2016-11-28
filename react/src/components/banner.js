@@ -9,6 +9,7 @@ class Banner extends Component {
       <div className='banner'>
         <h1>{this.props.message}</h1>
         <button onClick={this.props.updateMessage}>Update message</button>
+        <img src={'/assets/img/react-logo.png'} style={{ maxWidth: '400px', height: 'auto', margin: '0 auto' }} />
       </div>
     )
   }
