@@ -176,4 +176,64 @@ You'd probably have to move some of this logic up to a shared component or contr
 
 ### How react (and redux) works, kind of
 
-To be continued...
+With React, we start with a component. Like Angular, it's basically a "template" and a "controller", but it's all contained in one class. The "template" part is represented by the JSX primarily returned in the class's `render` method (hi Backbone), while the "controller" part is the rest of the class.
+
+```javascript
+// components/banner.js
+import React, { Component } from 'react'
+
+class Banner extends Component {
+
+  constructor(props) {
+    super(props)
+    this.state = {
+      message: 'Default message'
+    }
+  }
+
+  render() {
+    return (
+      <div>
+        <h1>{this.state.message}</h1>
+        <button>Update message</button>
+      </div>
+    )
+  }
+
+}
+
+export default Banner
+```
+
+This component reads its state from `this.state` and would change state with `this.setState(key, value)`. Whenever the state is updated, the render method is called to re-render the "view". We could easily add an updateMessage function here that does the same logic we did with Angular:
+
+```javascript
+class Banner extends Component {
+
+  constructor(props) {
+    super(props)
+    this.state = {
+      message: 'Default message'
+    }
+  }
+
+  render() {
+    return (
+      <div>
+        <h1>{this.state.message}</h1>
+        <button onClick={this.updateMessage.bind(this)}>Update message</button>
+      </div>
+    )
+  }
+
+  updateMessage() {
+    const message = messages.shift()
+    messages.push(this.state.message)
+    this.setState('message', message)
+  }
+}
+```
+
+And we'd basically have the Angular example implemented in React. But then there's Flux.
+
+(To be continued)
