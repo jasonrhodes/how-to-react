@@ -1,8 +1,8 @@
 import { combineReducers } from 'redux'
-import MessageReducer from './message'
+import BannerReducer from './banner'
 
 const reducers = {
-  message: MessageReducer
+  banner: BannerReducer
 }
 
 export default combineReducers(reducers)

@@ -67,39 +67,39 @@ In both of these examples so far, the "current message" is just whatever's in th
 
 ### How Angular works, kind of
 
-JS frameworks attempt to provide some ways to store your state, as well as your methods to change that state, in an organized way. If you're familiar with BackboneJS, it organized these things using models, collections, and views. With Angular, you have "components" (formerly directives), which are not much more than some config that ties together a template and a controller.
+JS frameworks attempt to provide some ways to store your state, as well as your methods to change that state, in an organized way. If you're familiar with BackboneJS, it organized these things using models, collections, and views. With Angular, you have "components" (formerly directives), which are not much more than some config that ties together an HTML template and a controller class.
 
+The banner template:
 ```html
-// templates/banner.html
 <div>
   <h1>{{ banner.message }}</h1>
   <button>Update message</button>
 </div>
 ```
 
+The banner component:
 ```javascript
-// controllers/banner.js
-export default class BannerCtrl {
+import template from '../templates/banner.html'
+
+class BannerCtrl {
   constructor() {
     this.message = 'Some default message'
   }
 }
 
-// components/banner.js
-import template from '../templates/banner.html'
-import BannerCtrl from '../controllers/banner'
-
-export default {
-  template,
-  controller: BannerCtrl,
-  controllerAs: 'banner'
-}
+export default angular.module('bannerComponent', [])
+  .component('banner', {
+    template,
+    controller: BannerCtrl,
+    controllerAs: 'banner'
+  })
 ```
 
-Some main JS file will tie all these together into an Angular "module", but this is the basic mechanics. Notice that the values aren't stored in the HTML/DOM anymore, but on the controller instance here (e.g. `this.message`). The template (view) refers to that value using `{{ }}` braces, and Angular makes sure that the HTML is auto-updated any time that value changes. To make those changes, I'd provide a method on the controller class and reference it in the template, like this:
+Notice how the values aren't stored in the HTML anymore, but on the controller instance here (e.g. `this.message`). The template (view) refers to that value using `{{ }}` braces, and Angular makes sure that the HTML is auto-updated any time that value changes. To make those changes, I'd provide a method on the controller class and reference it in the template, like this:
 
 ```javascript
-// controllers/banner.js
+import template from '../templates/banner.html'
+
 const messages = [
   'Default message for the banner',
   'A totally different random message',
@@ -107,7 +107,7 @@ const messages = [
   'Wow this is another message'
 ]
 
-export default class BannerCtrl {
+class BannerCtrl {
   constructor() {
     this.message = 'Some default message'
   }
@@ -118,22 +118,28 @@ export default class BannerCtrl {
     this.message = message
   }
 }
+
+export default angular.module('bannerComponent', [])
+  .component('banner', {
+    template,
+    controller: BannerCtrl,
+    controllerAs: 'banner'
+  })
 ```
 
+And then reference the new controller method from the template:
 ```html
-// templates/banner.html
 <div>
   <h1>{{ banner.message }}</h1>
   <button ng-click="banner.updateMessage()">Update message</button>
 </div>
 ```
 
-I'm using angular's `ng-click` attribute here to tap into the click event, during which I reference the controller as `banner` and call the new `updateMessage` method which rotates through the messages. Because the template is bound to a value stored in our state, when that controller value gets updated, Angular updates the HTML. It's everything you could ever want!
+This uses angular's `ng-click` attribute to tap into the click event, during which I reference the controller as `banner` and call the new `updateMessage` method which rotates through the messages. Because the template is bound to a value stored in our state, when that controller value gets updated, Angular updates the HTML.
 
-But what happens if updating the message is more complicated than just rotating through a hard-coded list? What if I want to make an API call to my super sweet banner message API to get a new message? In Angular, I'd probably define a "service" to make that easier.
+This works, but it's a good idea to move the message handling logic out of the controller (better organization, reuse, etc). Here's a simple message service:
 
 ```javascript
-// services/messages.js
 const messages = [
   'Default message for the banner',
   'A totally different random message',
@@ -141,28 +147,29 @@ const messages = [
   'Wow this is another message'
 ]
 
-export default class MessageService {
+export default class {
 
-  /**
-   * Could be an async HTTP call here...
-   */
   get() {
     const msg = messages.shift()
     messages.push(msg)
     return msg
   }
+
 }
 ```
 
-In this example, I'm still just hard-coding the list, but this could easily be an async HTTP call shared between various places in the app. Now in the controller, I reference Angular's magical dependency injection* and grab the new service in the constructor so it can be called to get a new message value.
-
-\*Try not to worry about this right now, `messageService` is just magically available like that
+Now the component can import the message service, depend on it in the angular module and then use it in the component controller's `updateMessage` method:
 
 ```javascript
-export default class BannerCtrl {
-  constructor(messageService) {
+import angular from 'angular'
+import template from '../templates/banner.html'
+import messageService from '../services/messages'
+
+class BannerCtrl {
+  constructor(messages) {
     this.message = ''
-    this.messages = messageService
+    this.buttonText = 'Update message'
+    this.messages = messages
     this.updateMessage()
   }
 
@@ -170,21 +177,29 @@ export default class BannerCtrl {
     this.message = this.messages.get()
   }
 }
+
+export default angular.module('bannerComponent', [messageService.name])
+  .component('banner', {
+    template,
+    controller: BannerCtrl,
+    controllerAs: 'banner'
+  })
+
 ```
 
-Here's the important thing to notice in this example: **When I call the service to get new data from the server and change the state, the return value of the service call comes back to the controller method, which then handles updating the controller's state**. If any other part of my app cares about this same data, I have to figure out how to share it, either by rearranging the app or by emitting events in controllers and listening in other controllers, etc. Of course this may not be a problem you run into often, but it's how Angular works.
+Take a look at [the Angular example code](angular) to see how this all works together.
 
-### How react (and redux) works, kind of
+### How React is kind of like Angular (\*ducks\*)
 
-A React app would also start with a component. Like Angular, it's basically a "template" and a "controller", but it's all contained in one class. The "template" part is represented here by the JSX returned in the class's `render` method (👋 Backbone), while the "controller" is basically the rest of the class.
+A React app also starts with a component. Like Angular, it's basically a "template" and a "controller", but it's all contained in one class. The "template" part is represented here by the JSX returned in the class's `render` method (👋 Backbone), while the "controller" is basically the rest of the class.
 
 If JSX freaks you out, read [Facebook's explanation](https://facebook.github.io/react/docs/jsx-in-depth.html).
 
+Here's the example banner component from before, as a React class component:
 ```javascript
-// components/banner.js
 import React, { Component } from 'react'
 
-class Banner extends Component {
+export default class Banner extends Component {
 
   constructor(props) {
     super(props)
@@ -203,40 +218,59 @@ class Banner extends Component {
   }
 
 }
-
-export default Banner
 ```
 
-This component reads from `this.state` and would make changes using `this.setState(key, value)`. Whenever the state is updated, the render method is called to re-render the "view". I could easily add an updateMessage function here that does the same logic that happened in the Angular example:
+This component reads from `this.state.message` and makes changes to that message using `this.setState({ message: 'new message' })`. Whenever the state is updated, the render method is called to re-render the "view". To complete the example from before, we can add an updateMessage method and move the message handling out to some service.
 
+The service might look like this:
+```js
+const messages = [
+  'Default message for the banner',
+  'A totally different random message',
+  'This message maybe came from an async API call',
+  'Wow this is another message'
+]
+
+export default {
+  get() {
+    const message = messages.shift()
+    messages.push(message)
+    return message
+  }
+}
+```
+_\*fwiw React doesn't have any "official" services like Angular, but encapsulating this kind of thing would still be a good idea, whatever you called it._
+
+And the refactored component:
 ```javascript
-class Banner extends Component {
+import React, { Component } from 'react'
+import messages from '../services/messages'
 
-  constructor(props) {
-    super(props)
+export default class Banner extends Component {
+  constructor() {
+    super()
     this.state = {
-      message: 'Default message'
+      message: 'The original message',
+      buttonText: 'Update message'
     }
+  }
+
+  updateMessage() {
+    this.setState({ message: messages.get() })
   }
 
   render() {
     return (
-      <div>
+      <div className='banner'>
         <h1>{this.state.message}</h1>
-        <button onClick={this.updateMessage.bind(this)}>Update message</button>
+        <button onClick={() => this.updateMessage()}>{this.state.buttonText}</button>
       </div>
     )
-  }
-
-  updateMessage() {
-    const message = messages.shift()
-    messages.push(this.state.message)
-    this.setState('message', message)
   }
 }
 ```
 
-And that's basically the Angular example implemented in React. State updates are handled in the same way, too, where the result is handed back to the calling method which then has to set the new state. But then there's Flux.
+And that's the banner example implemented in React. Take a look at [the complete React example](react) to see more.
 
 ### Uggggggggh what's flux what's redux why
 
@@ -253,11 +287,16 @@ import React, { Component } from 'react'
 import { updateMessage } from '../actions'
 
 class Banner extends Component {
+  constructor() {
+    this.state = {
+      message: 'Default message for the banner'
+    }
+  }
   render() {
     return (
       <div>
-        <h1>{this.props.message}</h1>
-        <button onClick={this.props.updateMessage}>Update message</button>
+        <h1>{this.state.message}</h1>
+        <button onClick={updateMessage}>Update message</button>
       </div>
     )
   }
@@ -266,7 +305,7 @@ class Banner extends Component {
 export default Banner
 ```
 
-To be fair, this wouldn't really work yet. But notice how the on click listener here doesn't do anything with its result. It doesn't wait for the new message and set it somewhere, it just says "update the message please thank you". In flux, that's called "an action". The update message action looks pretty familiar from the other examples:
+Disclaimer: I know this wouldn't work yet, but let's move slowly. Notice how the on click listener here (`updateMessage`) doesn't do anything with its result. It doesn't wait for the new message and set it somewhere, it just says "update the message please, thank you". In flux, that's called "creating an action". And update message should look pretty familiar, too:
 
 ```javascript
 const messages = [
@@ -287,7 +326,14 @@ export function updateMessage() {
 }
 ```
 
-The big difference here is what this method _returns_. That object with a `type` and a `payload` is the action. The `updateMessage` function is technically an "action creator", because calling it returns an action. But remember how the action isn't returned to the component ... so where does it go? I'll have to do a little more connecting in the component before that becomes clear:
+The big difference here is what this method _returns_. That object with a `type` and a `payload` is called an action, and is a flux convention. `updateMessage` is an "action creator" because calling it creates or returns an action. But that action isn't returned to the component, so where does it go? In redux, it go
+
+
+
+
+
+
+
 
 ```javascript
 import React, { Component } from 'react'

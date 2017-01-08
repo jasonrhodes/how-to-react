@@ -1,8 +1,9 @@
 import template from '../templates/footer.html'
 
-export default {
-  template,
-  bindings: {
-    url: '<'
-  }
-}
+export default angular.module('footerComponent', [])
+  .component('appFooter', {
+    template,
+    bindings: {
+      url: '<'
+    }
+  })

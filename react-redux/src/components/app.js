@@ -1,12 +1,13 @@
 import React, { Component } from 'react'
+import { connect } from 'react-redux'
 
 import Banner from './banner'
 import AppFooter from './footer'
 
 class App extends Component {
 
-  constructor() {
-    super()
+  constructor(props) {
+    super(props)
     this.state = {
       url: 'https://facebook.github.io/react/'
     }

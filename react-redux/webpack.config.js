@@ -23,7 +23,6 @@ module.exports = {
   },
   plugins: [],
   devServer: {
-    port: 8083,
     hot: true,
     historyApiFallback: true,
     contentBase: './public/'

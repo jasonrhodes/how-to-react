@@ -1,3 +1,5 @@
+import angular from 'angular'
+
 const messages = [
   'Default message for the banner',
   'A totally different random message',
@@ -5,14 +7,15 @@ const messages = [
   'Wow this is another message'
 ]
 
-export default class MessageService {
+export default angular.module('messageService', [])
+  .service('messages', class MessageService {
 
-  /**
-   * Could be an async HTTP call here...
-   */
-  get() {
-    const msg = messages.shift()
-    messages.push(msg)
-    return msg
-  }
-}
+    /**
+     * Could be an async HTTP call here...
+     */
+    get() {
+      const msg = messages.shift()
+      messages.push(msg)
+      return msg
+    }
+  })
