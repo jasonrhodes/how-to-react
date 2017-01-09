@@ -272,42 +272,61 @@ export default class Banner extends Component {
 
 And that's the banner example implemented in React. Take a look at [the complete React example](react) to see more.
 
-### Uggggggggh what's flux what's redux why
+### Why Flux?
 
-Facebook [describes flux](https://facebook.github.io/flux/) like this:
+To put it simply, Flux is "unidirectional data flow". It's not a library, but it's a pattern that a lot of Flux-happy libraries have adopted that works particularly well with React because of how fast React is at rendering, but you can use the Flux pattern with any framework.
 
-> It complements React's composable view components by utilizing a unidirectional data flow. It's more of a pattern rather than a formal framework, and you can start using Flux immediately without a lot of new code.
+Say you have a "chart component" on a page, that consists of subcomponents for the graph itself and a filter input to change the data displayed in the graph. In Angular, the data flow might look something like this:
 
-That description never helped me, to be honest. "More of a pattern" made it hard to practically sink my teeth into it. It really wasn't until I started playing with a _flavor_ or implementation of flux, called [Redux](http://redux.js.org/), that it finally started to click. "Unidirectional data flow" is pretty nice, it turns out.
+![Data flow in Angular](img/data-flow-angular.4.png)
 
-Look at the React component from our previous example, adapted to work in a "flux way", using Redux.
+When a user types in the filter input, this might happen:
 
-```javascript
+1. The filter component calls a method on the service to get more data
+1. The service makes a request, then gets the result
+1. The service passes the result back to the filter
+1. The filter has to send that new information up to the parent chart
+1. The chart alerts the graph to update its data
+
+If some "other component" that's also on the page would like access to this newly filtered data, you'll need to have the filter somehow pass it, or the chart could emit an event that the other component could listen on, etc. Since data is flowing in all different directions between all different pieces, things can get out of hand.
+
+Compare this to the Flux pattern, in general:
+
+![Data flow with the flux pattern](img/data-flow-ngFlux.1.png)
+
+Now the flow is:
+
+1. The filter calls a method called an "action creator" which will get more data
+1. The action creator makes a request, then gets the result
+1. The action creator returns an "action", with a `type` and a `payload` (which is the new data)
+1. The action is sent to the store
+1. The store is connected to all components, and depending on the type of action, components are re-rendered with new data
+
+Now data flows in a single direction, and while the pub-sub pattern is still happening somewhat, the "sub" side is in one place and much easier to reason about. Also, if any component wants to listen to an action type, it can, without any code changes.
+
+### Redux, a form of Flux
+
+Look at the React component from our previous example, adapted to work in a "flux way", using a flux library called Redux.
+
+```js
 import React, { Component } from 'react'
 import { updateMessage } from '../actions'
 
-class Banner extends Component {
-  constructor() {
-    this.state = {
-      message: 'Default message for the banner'
-    }
-  }
+export default class Banner extends Component {
   render() {
     return (
       <div>
-        <h1>{this.state.message}</h1>
+        <h1>{this.props.message}</h1>
         <button onClick={updateMessage}>Update message</button>
       </div>
     )
   }
 }
-
-export default Banner
 ```
 
-Disclaimer: I know this wouldn't work yet, but let's move slowly. Notice how the on click listener here (`updateMessage`) doesn't do anything with its result. It doesn't wait for the new message and set it somewhere, it just says "update the message please, thank you". In flux, that's called "creating an action". And update message should look pretty familiar, too:
+The first thing you might notice is that there's no constructor and no local state. You can have local state even while using Redux, but in our example we won't have any. Instead, we'll get all of our values from the Redux store, which will be connected to `this.props` in our component. This component isn't connected to the Redux store yet so we'll have to come back and connect it, but let's first look at the `updateMessage` action creator:
 
-```javascript
+```js
 const messages = [
   'A totally different random message',
   'This message maybe came from an async API call',
@@ -326,16 +345,48 @@ export function updateMessage() {
 }
 ```
 
-The big difference here is what this method _returns_. That object with a `type` and a `payload` is called an action, and is a flux convention. `updateMessage` is an "action creator" because calling it creates or returns an action. But that action isn't returned to the component, so where does it go? In redux, it go
+It looks a lot like the service in the earlier example, except that it returns _an action_ instead of the new value by itself. By flux convention, the value is stored as `payload` and a `type` is set. The action is sent to the store, which then needs to know how to process the action and send the new data to registered components. In Redux, this is done in part using functions called "reducers". The main reducers file that represents the entire store might look like this in our example:
 
+```js
+import { combineReducers } from 'redux'
+import BannerReducer from './banner'
 
+const reducers = {
+  banner: BannerReducer
+}
 
+export default combineReducers(reducers)
+```
 
+This means that the store, which is one big object, has a key called `banner` whose value is controlled by the `BannerReducer`. You can have as many keys controlled by reducers as you want here. Those reducers look like this:
 
+```js
+const defaultBanner = {
+  message: 'Default message for the banner',
+  buttonText: 'Update message'
+}
 
+export default (state = defaultBanner, action) => {
+  switch (action.type) {
+    case 'UPDATE_MESSAGE':
+      return {
+        ...state,
+        message: action.payload
+      }
 
+    default:
+      return state
+  }
+}
+```
 
-```javascript
+The function defined here is given the current `state` (but only the value it's responsible for, so the `banner` key in this case) and the action that was created. Then for each expected `action.type`, the reducer returns the appropriate state. Sometimes it might pull something out of the payload or rearrange it, sometimes it might just set it to a new key. And by default, it returns the state unaltered.
+
+The last step is to go back to our component and connect it to the store. To do that, we need to use a function cleverly called `connect`, provided by a library called `react-redux`.
+
+![react-redux overwhelming tweet](img/tweet-react-redux.png)
+
+```js
 import React, { Component } from 'react'
 import { connect } from 'react-redux'
 
@@ -344,7 +395,7 @@ import { updateMessage } from '../actions'
 class Banner extends Component {
   render() {
     return (
-      <div>
+      <div className='banner'>
         <h1>{this.props.message}</h1>
         <button onClick={this.props.updateMessage}>Update message</button>
       </div>
@@ -352,59 +403,21 @@ class Banner extends Component {
   }
 }
 
-function mapStateToProps(state) {
-  return { message: state.message }
-}
-
-function bindActionCreators() {
+const mapStateToProps = (state) => state.banner
+const bindActionCreators = () => {
   return { updateMessage }
 }
 
 export default connect(mapStateToProps, bindActionCreators)(Banner)
 ```
 
-Two new functions here in the component: `mapStateToProps` (for reading state) and `bindActionCreators` (for updating state). The `connect` method allows the component to be connected to the single store where all of the redux state values are kept. This component only cares about `state.message`, so we "map" our state to our component and only give it the `state.message` value. Now we can reference `this.props.message` in our component JSX.
+The connection here is happening in four steps:
 
-To update state, we need to bring in an action creator and connect it to our component so that redux knows about it. The `bindActionCreators` function just returns a hash of methods that should be registered with redux (will talk about that more in a second) and made available on the component's `this.props` as well.
+1. Define a function called `mapStateToProps` that will receive the entire global state and return just the parts we care about.
+1. Define a function called `bindActionCreators` that will return an object hash of the action creator methods we want to use
+1. Call the `connect` function with `mapStateToProps` and `bindActionCreators` as args -- it will return another function
+1. Call the function returned from `connect`, passing it the component
 
-So with these two funcdtions and the `connect` utility, this component is connected to the global redux state. When `this.props.updateMessage` is called in the onClick listener, the action creator returns this action:
+Once that's done, the component works! Clicking the button calls the action creator, and since we connected it to the Redux store, Redux will receive the action and pass it to _all_ the reducers, who will look at the type and either modify their own part of the state tree or let it just pass through. Any reducer who cares about the `UPDATE_MESSAGE` action will assign the new values to the `banner` key, which will cause any components connected to that part of the state to re-render.
 
-```javascript
-{
-  type: 'UPDATE_MESSAGE',
-  payload: message // some new message
-}
-```
-
-Every single action created (so long as the action creator was registered with redux using the `connect` utility) is passed to a list of functions, kind of like event listeners, known as "reducers". This is the redux-specific part of the lesson. This app might have a message reducer that could look like this:
-
-```javascript
-export default (state = 'Default message for the banner', action) => {
-  switch (action.type) {
-    case 'UPDATE_MESSAGE':
-      return action.payload
-
-    default:
-      return state
-  }
-}
-```
-
-This function would be called for _every_ action ever created by the app, so the `switch` statement specified which action types this reducer cares about. This lets reducers "listen" to any actions they want to listen to, which allows components to share access to any part of the global state, whenever they want.
-
-We set up all of our reducers like this:
-
-```javascript
-import { combineReducers } from 'redux'
-import MessageReducer from './message'
-
-const reducers = {
-  message: MessageReducer
-}
-
-export default combineReducers(reducers)
-```
-
-The `reducers` constant here is the global state object. `message` is a top-level key whose value is managed by the Message reducer, which by default returns "Default message for the banner", using JS default values. Any time an action of type 'UPDATE_MESSAGE' is called, the reducer expects the `payload` key to be the new message, and returns that value which replaces the old. Any components that are connected to that state value would be re-rendered.
-
-### Buh guh
+PHEW.
